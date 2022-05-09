@@ -88,16 +88,21 @@
         
 
 import requests, json
+import pretty
 
-api_currency_usd = "https://api.exchangerate-api.com/v4/latest/usd"
+api_currency_usd = pretty.api_currency_usd
 
-api_currency_cny = "https://api.exchangerate-api.com/v4/latest/cny"
+api_currency_cny = pretty.api_currency_cny
+
+api_currency_usd_v4 = "https://api.exchangerate-api.com/v4/latest/usd"
+
+api_currency_cny_v4 = "https://api.exchangerate-api.com/v4/latest/cny"
 
 s = requests.Session()
 
 
 def converter_currency_cny_usd(prices):
-    c = json.loads(s.get(api_currency_cny).text)['rates']['USD']
+    c = json.loads(s.get(api_currency_cny).text)['conversion_rates']['USD']
     if type(prices) == list: 
         pr = []
         for price in prices:
@@ -109,7 +114,7 @@ def converter_currency_cny_usd(prices):
         return round(prices * float(c), 2)
 
 def converter_currency_cny_rub(prices):
-    c = json.loads(s.get(api_currency_cny).text)['rates']['RUB']
+    c = json.loads(s.get(api_currency_cny).text)['conversion_rates']['RUB']
     if type(prices) == list: 
         pr = []
         for price in prices:
@@ -123,7 +128,7 @@ def converter_currency_cny_rub(prices):
 
 
 def converter_currency_usd_rub(prices):
-    c = json.loads(s.get(api_currency_usd).text)['rates']['RUB']
+    c = json.loads(s.get(api_currency_usd).text)['conversion_rates']['RUB']
     if type(prices) == list: 
         pr = []
         for price in prices:
@@ -135,6 +140,19 @@ def converter_currency_usd_rub(prices):
         return round(prices * float(c), 2)
 
 
+def generator_autobuy_rub(data: list):
+    c = json.loads(s.get(api_currency_usd).text)['conversion_rates']['RUB']
+    p = ""
+    for i in data:
+        p += "{}({}), ".format(round(i['request_price'] * float(c), 2), i['request_count'])
+    return p
+
+def generator_autobuy(data: list):
+    p = ""
+    for i in data:
+        p += "{}({}), ".format(i['request_price'], i['request_count'])
+    return p
+
 def generator_steam(data: list):
     p = ""
     for i in data:
@@ -142,14 +160,14 @@ def generator_steam(data: list):
     return p
 
 def generator_buys(data: list):
-    c = json.loads(s.get(api_currency_cny).text)['rates']['USD']
+    c = json.loads(s.get(api_currency_cny).text)['conversion_rates']['USD']
     p = ""
     for buy in data:
         p += "[{}$](http://{}.huinya.date), ".format(round(float(buy['price']) * float(c), 2), buy['date'])
     return p
 
 def generator_buys_rub(data: list):
-    c = json.loads(s.get(api_currency_cny).text)['rates']['RUB']
+    c = json.loads(s.get(api_currency_cny).text)['conversion_rates']['RUB']
     p = ""
     for buy in data:
         p += "[{}₽](http://{}.huinya.date), ".format(round(float(buy['price']) * float(c), 2), buy['date'])

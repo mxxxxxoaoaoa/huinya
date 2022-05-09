@@ -6,7 +6,11 @@ from aiogram.utils.markdown import link, bold, underline
 import utils, config
 from aiogram import types
 import urllib.parse
+import keyboards as kb
+import pretty
+
 parser = HuinyaParser()
+
 
 def margin(tm, buff):
     margin = ((tm - buff) / tm) * 100
@@ -17,102 +21,235 @@ def steam_margin(buff, steam):
     margin = ((s - buff) / s) * 100
     return round(margin, 2 )
 
-
-
-async def worker(bot):
-    all_items = parser.get_all_items()
-    for item in all_items:
-        data = parser.buff_rust_prices(item)
-        buff_link = "https://buff.163.com/goods/{}?from=market#tab=selling".format(item)
-
-        name = data['name']
-        prices = data['prices']
-        buys = parser.buff_buyers(item)
-        print('near 1 template')
-    
-        a = config.template_1.format(
-                name,
-                data['icon_url'],
-                buff_link,
-                len(prices),
-                "$, ".join(map(str, utils.converter_currency_cny_usd(prices))),
-                "₽, ".join(map(str, utils.converter_currency_cny_rub(prices))),
-                utils.generator_buys(buys),
-                utils.generator_buys_rub(buys)
+async def worker_one(bot, item):
+    try:
+        data = parser.buff_rust_price_one()
+    except:
+        await bot.send_message(
+            pretty.goods, 
+            "куки ёбнули",
+            reply_markup = kb.good_kb(),
+            parse_mode=types.ParseMode.MARKDOWN
             )
-        message_text = a
-        # print("name - {}; steam_price - {}; prices - {}; buys - {}".format(data['name'], data['steam_price'], data['prices'], buys))
-        market_data = parser.market_rust_all(data['name'])
-        print(len(market_data))
-        if len(market_data) != 0:
-            link = market_data[0]['link']
-            print('near extend')
-            extend = parser.market_rust_extended(link)                  
-            print('after extend')
-            counts = len(market_data)
-            pokypki = extend['buys']
-            print('after pokypki')
-            m = extend['min_price']
-            avg = extend['averange'],
-            print(avg[0])
-            mx = extend['max_price']
-            now = extend['prices']
-            print(market_data)
+    buff_link = "https://buff.163.com/goods/{}?from=market#tab=selling".format(item)
+
+    name = data['name']
+    prices = data['prices']
+    buys = parser.buff_buyers(item)
+    message_text = ""
+    print(data)
+    market_data = parser.market_rust_all(data['name'])
+    print(market_data)
+    print(len(market_data))
+    if len(market_data) > 0:
+        print('len > 0')
+        link = market_data[0]['link']
+        try:
+            extend = parser.market_rust_extended(link)
+        except:
+            await bot.send_message(
+                pretty.goods, 
+                "НАС ТРАХНУЛ РАСТ.ТМ. ПИДАРАСЫ?",
+                reply_markup = kb.good_kb(),
+                parse_mode=types.ParseMode.MARKDOWN)
+            
+        counts = len(market_data)
+        pokypki = extend['buys']
+        m = extend['min_price']
+        avg = extend['averange'],
+        mx = extend['max_price']
+        now = extend['prices']
+        ab_all = extend['autobuy']['all']
+        autobuy_dollars = extend['autobuy']['requests']
+        try:
+            print(prices[0])
             profit = margin(now[0], utils.converter_currency_cny_usd(prices[0]))
-            print(profit)
-            print('near 2 template')
-            b = config.template_2.format(
-                link,
-                counts,
-                pokypki,
-                m, avg[0], mx,
-                utils.converter_currency_usd_rub(m), utils.converter_currency_usd_rub(avg[0]), utils.converter_currency_usd_rub(mx),
-                now,
-                utils.converter_currency_usd_rub(now),
-                profit,
-            )
-            message_text = a + b
-            # print("количество - {}; покупок - {}; мин. - {}; ср. - {}; макс. - {}; текущие - {}".format(counts, buys, min_price, averange[0], max_price, now_prices))
-        print('near else ')
-        if len(market_data) == 0:
-            b = config.template_3
-            message_text = a + b
-        
-        print('near steam')
+
+        except:
+            await bot.send_message(
+                pretty.goods, 
+                "НАС ТРАХНУЛ КУРС ВАЛЮТ. ГНИДЫ.",
+                reply_markup = kb.good_kb(),
+                parse_mode=types.ParseMode.MARKDOWN)
+            
+        b = config.template_2.format(
+            link,
+            counts,
+            pokypki,
+            m, avg[0], mx,
+            utils.converter_currency_usd_rub(m), utils.converter_currency_usd_rub(avg[0]), utils.converter_currency_usd_rub(mx),
+            now,
+            utils.converter_currency_usd_rub(now),
+            ab_all,
+            utils.generator_autobuy(autobuy_dollars),
+            utils.generator_autobuy_rub(autobuy_dollars),
+        )
+    if len(market_data) == 0:
+        b = config.template_3
+        profit = "⛔️ "
+    try:
         steams_orders = parser.steam_parser(name)
-        print('after steam')
+    except:
+            await bot.send_message(
+                pretty.goods, 
+                "НАС ТРАХНУЛ СТИМ. ладно... согласен, по пидорски поступил.",
+                reply_markup = kb.good_kb(),
+                parse_mode=types.ParseMode.MARKDOWN)
+    try:
         rubles = utils.generator_steam(steams_orders[1])
         dollars = utils.generator_steam(steams_orders[0])
-        print(rubles, dollars)
-        print('near 4 template')
-        # print(prices[0], steams_orders[1][0])
+    except:
+            await bot.send_message(
+                pretty.goods, 
+                "НАС ТРАХНУЛ КУРС ВАЛЮТ. ГНИДЫ.",
+                reply_markup = kb.good_kb(),
+                parse_mode=types.ParseMode.MARKDOWN)
+    try:
         marg = steam_margin(utils.converter_currency_cny_rub(prices[0]), steams_orders[1][0]['price'])
-        print(marg)
-        c = config.template_4.format(
-            f"https://steamcommunity.com/market/listings/252490/{urllib.parse.quote(name)}",
-            dollars,
-            rubles,
-            marg
+    except:
+            await bot.send_message(
+                pretty.goods, 
+                "НАС ТРАХНУЛ КУРС ВАЛЮТ. ГНИДЫ.",
+                reply_markup = kb.good_kb(),
+                parse_mode=types.ParseMode.MARKDOWN)
+    print('near c template')
+    c = config.template_4.format(
+        f"https://steamcommunity.com/market/listings/252490/{urllib.parse.quote(name)}",
+        dollars,
+        rubles
+    )
+    a = config.template_1.format(
+            name,
+            data['icon_url'],
+            profit,
+            marg,
+            buff_link,
+            len(prices),
+            "$, ".join(map(str, utils.converter_currency_cny_usd(prices))),
+            "₽, ".join(map(str, utils.converter_currency_cny_rub(prices))),
+            utils.generator_buys(buys),
+            utils.generator_buys_rub(buys)
         )
-        print('after template')
-        message_text += c
+    print('after a template near message')
+    message_text = a + b + c
+    await bot.send_message(
+            pretty.goods, 
+            message_text,
+            reply_markup = kb.good_kb(),
+            parse_mode=types.ParseMode.MARKDOWN)
 
+
+
+async def worker_many(bot):
+    all_items = parser.get_all_items()
+    try:
+        for item in all_items:
+
+            data = parser.buff_rust_prices(item)
+            buff_link = "https://buff.163.com/goods/{}?from=market#tab=selling".format(item)
+
+            name = data['name']
+            prices = data['prices']
+            buys = parser.buff_buyers(item)
+            message_text = ""
+    
+            market_data = parser.market_rust_all(data['name'])
+            if len(market_data) != 0:
+                link = market_data[0]['link']
+                try:
+                    extend = parser.market_rust_extended(link)
+                except:
+                    await bot.send_message(
+                        pretty.logs, 
+                        "НАС ТРАХНУЛ РАСТ.ТМ. ПИДАРАСЫ?",
+                        parse_mode=types.ParseMode.MARKDOWN)
+                    
+                counts = len(market_data)
+                pokypki = extend['buys']
+                m = extend['min_price']
+                avg = extend['averange'],
+                mx = extend['max_price']
+                now = extend['prices']
+                ab_all = extend['autobuy']['all']
+                autobuy_dollars = extend['autobuy']['requests']
+                try:
+                    profit = margin(now[0], utils.converter_currency_cny_usd(prices[0]))
+                except:
+                    await bot.send_message(
+                        pretty.logs, 
+                        "НАС ТРАХНУЛ КУРС ВАЛЮТ. ГНИДЫ.",
+                        parse_mode=types.ParseMode.MARKDOWN)
+                    
+                b = config.template_2.format(
+                    link,
+                    counts,
+                    pokypki,
+                    m, avg[0], mx,
+                    utils.converter_currency_usd_rub(m), utils.converter_currency_usd_rub(avg[0]), utils.converter_currency_usd_rub(mx),
+                    now,
+                    utils.converter_currency_usd_rub(now),
+                    ab_all,
+                    utils.generator_autobuy(autobuy_dollars),
+                    utils.generator_autobuy_rub(autobuy_dollars),
+                )
+            if len(market_data) == 0:
+                b = config.template_3
+            try:
+                steams_orders = parser.steam_parser(name)
+            except:
+                    await bot.send_message(
+                        pretty.logs, 
+                        "НАС ТРАХНУЛ СТИМ. ладно... согласен, по пидорски поступил.",
+                        parse_mode=types.ParseMode.MARKDOWN)
+            try:
+                rubles = utils.generator_steam(steams_orders[1])
+                dollars = utils.generator_steam(steams_orders[0])
+            except:
+                    await bot.send_message(
+                        pretty.logs, 
+                        "НАС ТРАХНУЛ КУРС ВАЛЮТ. ГНИДЫ.",
+                        parse_mode=types.ParseMode.MARKDOWN)
+            try:
+                marg = steam_margin(utils.converter_currency_cny_rub(prices[0]), steams_orders[1][0]['price'])
+            except:
+                    await bot.send_message(
+                        pretty.logs, 
+                        "НАС ТРАХНУЛ КУРС ВАЛЮТ. ГНИДЫ.",
+                        parse_mode=types.ParseMode.MARKDOWN)
+            c = config.template_4.format(
+                f"https://steamcommunity.com/market/listings/252490/{urllib.parse.quote(name)}",
+                dollars,
+                rubles
+            )
+            try:
+                a = config.template_1.format(
+                        name,
+                        data['icon_url'],
+                        profit,
+                        marg,
+                        buff_link,
+                        len(prices),
+                        "$, ".join(map(str, utils.converter_currency_cny_usd(prices))),
+                        "₽, ".join(map(str, utils.converter_currency_cny_rub(prices))),
+                        utils.generator_buys(buys),
+                        utils.generator_buys_rub(buys)
+                    )
+            except:
+                    await bot.send_message(
+                        pretty.logs, 
+                        "НАС ТРАХНУЛ КУРС ВАЛЮТ. ГНИДЫ.",
+                        parse_mode=types.ParseMode.MARKDOWN)
+            message_text = a + b + c
+            await bot.send_message(
+                    pretty.logs, 
+                    message_text,
+                    parse_mode=types.ParseMode.MARKDOWN)
+    except:
         await bot.send_message(
-                "-1001509146655", 
-                message_text,
+                pretty.logs, 
+                "НАС ТРАХНУЛ БОТ. ладно, бро, прости, зачилься реально как гнида поступил, извини брат",
                 parse_mode=types.ParseMode.MARKDOWN)
 
 
 
 
-# l = [842630, 844043, 842628, 843078, 892170, 883570, 844461, 890586, 843936, 844593, 858146, 844953, 863054, 880757, 844863, 853081, 844057, 891196, 891197, 842996, 864073, 872156, 843144, 843247, 844139, 842624, 844044, 844241, 842626, 844045, 843650, 892162, 892161, 867865, 844879, 855259, 846619, 850101, 884572, 842841, 864785, 844347, 844966, 885464, 842652, 844589, 844675, 854768, 844239, 858150, 858985, 847379, 844040, 844438, 843932, 843611, 891606, 844756, 844930, 842680, 844207, 843496, 843398, 842751, 842984, 844954, 844256, 844595, 844072, 843397, 844156, 842582, 883576, 867517, 882531, 867866, 893022, 844856, 858589, 843590, 844400, 842774, 842625, 843395, 843246, 842888, 849418, 892568, 873646, 844287, 861235, 885955, 845024, 844077, 889707, 844185, 844696, 864790, 882534, 882530, 842621, 859748, 855262, 843361, 844857, 864783, 843070, 843766, 842995, 881693, 872154, 881694, 843591, 844585, 843013, 844682, 884577, 869064, 844964, 844735, 887557, 843463, 842618, 846588, 858149, 844586, 842967, 855261, 844245, 843195, 843188, 842670, 869896, 855260, 844430, 844288, 861799, 891605, 858987, 857050, 854794, 863065, 864070, 844338, 844569, 844598, 888106, 844539, 844299, 861795, 867864, 844538, 843922, 877269, 844291, 844290, 843705, 844007, 858583, 855736, 849421, 851528, 851525, 844238, 842682, 856488, 843965, 843971, 843490, 843781, 843784, 844460, 844137, 852516, 843424, 844181, 845047, 864792, 844694, 843404, 844171, 844039, 843737, 844578, 844899, 844056, 853080, 844596, 844841, 843056, 868660, 844462, 861232, 866215, 869050, 844149, 842635, 843248, 844453, 849481, 844861, 853710, 844401, 844885, 864669, 842790, 846594, 843953, 842877, 842925, 859755, 844577, 842825, 844106, 842846, 844973, 844681, 843801, 842588, 855729, 844554, 844322, 892165, 892166, 883574, 842627, 886603, 869052, 844601, 874576, 843985, 844974, 853715, 844008, 844150, 844170, 844035, 844132, 844597, 888620, 844004, 868662, 844950, 866723, 865507, 853086, 878163, 857042, 842666, 843699, 844579, 843072, 844691, 843467, 843772, 869046, 844816, 879707, 844571, 863049, 890585, 843216, 859747, 861796, 881692, 882529, 888107, 866725, 843818, 880758, 844271, 850669, 851059, 892572, 844914, 865505, 859750, 844343, 855257, 843852, 844166, 844456, 893030, 842886, 843457, 844727, 844594, 844591, 843236, 853087, 855256, 842609, 862506, 858984, 844884, 855732, 842656, 844830, 843410, 844286, 846593, 843227, 844392, 844734, 891602, 844800, 843053, 844759, 848252, 843179, 856492, 889322, 869058, 867867, 846652, 864671, 892567, 843984, 857043, 842734, 862508, 844109, 844136, 867540, 844959, 844960, 842983, 864784, 844140, 889698, 891611, 843399, 866218, 843773, 843405, 843026, 842962, 842705, 853084, 846586, 844731, 844625, 843934, 842834, 844728, 843401, 846620, 858584, 879665, 842687, 844014, 852492, 890593, 858986, 843065, 853085, 844592, 843656, 858983, 844351, 890264, 872152, 843396, 843420, 844226, 862509, 864672, 845010, 844359, 884112, 843966, 843194, 844721, 842741, 858590, 842612, 888618, 884115, 845025, 844071, 868664, 844657, 856489, 844016, 844015, 844470, 844860, 878172, 863050, 878162, 844477, 844941, 842780, 843606, 843208, 843151, 844196, 843987, 844908, 844760, 844432, 844408, 863048, 846622, 845043, 845022, 845009, 844909, 888116, 879709, 872153, 869901, 867863, 880763, 843576, 844083, 868661, 874570, 844700, 892570, 863053, 846663, 844141, 843354, 843775, 843314, 878164, 843106, 843722, 844042, 844513, 844092, 844741, 844218, 844458, 843139, 842947, 843812, 844729, 844703, 843546, 844159, 843757, 843841, 844080, 844984, 844272, 842653, 843003, 843193, 843048, 843005, 844393, 842665, 844730, 844293, 844584, 844526, 844324, 844064, 843854, 843437, 843229, 843226, 843079, 870541, 866731, 845021, 844957, 843336, 854187, 843704, 843174, 843964, 842926, 842999, 842865, 842724, 842726, 844070, 843770, 843252, 844009, 843867, 843635, 843150, 843143, 842845, 844556, 843829, 842805, 882528, 844631, 846657, 844948, 844209, 842683, 844154, 844779, 844339, 843991, 843603, 842765, 844157, 845014, 843673, 843308, 842781, 842963, 843330, 842857, 842954, 842662, 842802, 843649, 842880, 843000, 843192, 843366, 844929, 842818, 844395, 843667, 842840, 844452, 843138, 842596, 842716, 843131, 842838, 844300, 843408, 843110, 843360, 843516, 842908, 842848, 843090, 842872, 842900, 843027, 843006, 858588, 844802, 851522, 883577, 861234, 844549, 844649, 844547, 844060, 842584, 846592, 842981, 844298, 842623, 842814, 844869, 854795, 889705, 867878, 846665, 844227, 844492, 843122, 844261, 844230, 856493, 857048, 857049, 856540, 885956, 844276, 843060, 844552, 889321, 882527, 843986, 844305, 842771, 880210, 849437, 848257, 846603, 849428, 858168, 846600, 842817, 843113, 846607, 843979, 844093, 844782, 844355, 843416, 843575, 865409, 858162, 858166, 844065, 844616, 843978, 880208, 846615, 864795, 844487, 843666, 864797, 843672, 842911, 843898, 846634, 842776, 842678, 842740, 842874, 842777, 842693, 842783, 843942, 842649, 842679, 844796, 842767, 846635, 844989, 844799, 842736, 844876, 843022, 843465, 843001, 842753, 842645, 842731, 843876, 857047, 842894, 843883, 843643, 843017, 843037, 842915, 843621, 842581, 843313, 842992, 842657, 843924, 843580, 844562, 843025, 842659, 844419, 843385, 843250, 843532, 843069, 842787, 842598, 843855, 843044, 842672, 867521, 844999, 858585, 843242, 843018, 842998, 843286, 842803, 843879, 842832, 844211, 881696, 844826, 844111, 843906, 843642, 843159, 843035, 842955, 842843, 842804, 842727, 844927, 843049, 842685, 844931, 843834, 844543, 842833, 844854, 877262, 844433, 843443, 843280, 843230, 843051, 842972, 842917, 842663, 843570, 844801, 844345, 843549, 842826, 842650, 844935, 844325, 842700, 844618, 843618, 844912, 844678, 844100, 843215, 842744, 842684, 861798, 844632, 842909, 844855, 885953, 844692, 844327, 843875, 843097, 842750, 842708, 842641, 844693, 844041, 843661, 843552, 843050, 842913, 844328, 844540, 842899, 872580, 844962, 844928, 844866, 844590, 843558, 843155, 842756, 844665, 887556, 844867, 843317, 872581, 844348, 843695, 843436, 843335, 842873, 843733, 843148, 844993, 843764, 843452, 843145, 842709, 867869, 850094, 872155, 844977, 844690, 844658, 844583, 844055, 843853, 842712, 890587, 844978, 843191, 883571, 862505, 862503, 844617, 844274, 844191, 843241, 843177, 843107, 842746, 844732, 844757, 844450, 844216, 843903, 843101, 842775, 842669, 842597, 869910, 867519, 844169, 844061, 880759, 854185, 845048, 844702, 844689, 844292, 843734, 842827, 844795, 861802, 842892, 844951, 885465, 879667, 858158, 845031, 844352, 862501, 843290, 872151, 866728, 844952, 843645, 842749, 869904, 872584, 844926, 842664, 869913, 867522, 864668, 861246, 851526, 850092, 844911, 844882, 844780, 844688, 844672, 844628, 844527, 844350, 844231, 844068, 843993, 843968, 843610, 843403, 843400, 843371, 843289, 843190, 843142, 843087, 842871, 842842, 842638, 842633, 861244, 843806, 891193, 876120, 868659, 867872, 858591, 853083, 844750, 843882, 843505, 880760, 844888, 889704, 866216, 845002, 845001, 844859, 844807, 844284, 844229, 844188, 844107, 843204, 842858, 843967, 864074, 844472, 844090, 842812, 872583, 842829, 892566, 890266, 872579, 865576, 865504, 850097, 844983, 844956, 844813, 844619, 844555, 844147, 844116, 843970, 843774, 843383, 843301, 843299, 842966, 842717, 842606, 842583, 891612, 864678, 843555, 890589, 870539, 869902, 861245, 859752, 846597, 844704, 844340, 844337, 844329, 843728, 886599, 844380, 884121, 850100, 849411, 844903, 844829, 844638, 844402, 844243, 844172, 844101, 844031, 843994, 843962, 843926, 843925, 843701, 843597, 843456, 843210, 843162, 843062, 842950, 849486, 892168, 844771, 844660, 844161, 843951, 843474, 843430, 843326, 843170, 888624, 888623, 845028, 844479, 888625, 884891, 865506, 843011, 843009, 842807, 891207, 890273, 885469, 881690, 867870, 863051, 862504, 850672, 844599, 844346, 843921, 843528, 843263, 864670, 851524, 843628, 887564, 858165, 851068, 844664, 844267, 890263, 884571, 848260, 845040, 844733, 844661, 844469, 892569, 885954, 877261, 864076, 855735, 855733, 846655, 846598, 846596, 845038, 845037, 845026, 845017, 844875, 844818, 844808, 844600, 844283, 844197, 844133, 844017, 843717, 843608, 843572, 842932, 842647, 885957, 846647, 844066, 888118, 887566, 887565, 873642, 844810, 883569, 854770, 850095, 845042, 844609, 843435, 884576, 856490, 888615, 877271, 888115, 887553, 876184, 866734, 861233, 854773, 852498, 849414, 844848, 844825, 844151, 844085, 844058, 843891, 843739, 890592, 864781, 851527, 844334, 842891, 868666, 889706, 888108, 887559, 887554, 885471, 854771, 846595, 844936, 844798, 844580, 844001, 843949, 887558, 844932, 891603, 864676, 890588, 888619, 884113, 883572, 866727, 864796, 862500, 855258, 850675, 845044, 844938, 844895, 844435, 844224, 843827, 843059, 842616, 842971, 883568, 844710, 844379, 892164, 888617, 858586, 846650, 855734, 877266, 847381, 858587, 844162, 893018, 881139, 877267, 866729, 861800, 853082, 846582, 844809, 844163, 844037]
-
-# pages = parser.get_pages()
-# all_items = []
-# for page in range(1, pages):
-#     items = parser.buff_rust(page)
-#     print(items)
-#     all_items += items
-# print(all_items)
-# l.sort()
-# print(l)

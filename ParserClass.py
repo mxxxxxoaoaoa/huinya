@@ -1,9 +1,11 @@
+from email import header
 from aiogram import bot, types
 from bs4 import BeautifulSoup as bs
 import requests, json
 from datetime import datetime
 import re
 import urllib.parse
+import pretty
 
 api_currency = "https://api.exchangerate-api.com/v4/latest/USD"
 
@@ -13,22 +15,11 @@ buff_item_url = "https://buff.163.com/api/market/goods/sell_order?game=rust&good
 buff_buyers_url = "https://buff.163.com/api/market/goods/bill_order?game=rust&goods_id={}"
 tm_url = "https://rust.tm/?t=all&search={}&sd=desc"
 
-buff_header = {
-    "Cookie": "P_INFO=380-989838838|1650356312|1|netease_buff|00&99|null&null&null#UA&null#10#0|&0||380-989838838; Locale-Supported=en; NTES_YD_SESS=0JikbwZfwPpVs1zn7rv_.MXP33v5VNOH8SH2brLTn1rIxEsuyJbzrrNlltE6TwzbxCWdqfrQqrJM1zY9Mb8XPkyv1o3sCUiAaE0eqHuwahQ6dwB_FC1EZs.vi44ig2RR1VAkAWVd_5rJD2PereoqX2ki5XK5AFD48ndVCQWR.RRsdH997bHjqvNAkwZhoFa0DMdgyYWXUpvCAJmcSH06DWzY0Htz2zMgmrQfOXGSisUsk; S_INFO=1650356312|0|0&60##|380-989838838; to_steam_processing_click220419T14894701241=1; to_steam_processing_click220419T14890631261=1; to_steam_processing_click220425T15271183701=1; session=1-vXRVRNMhvDxhekr_qqGo8xB4sYtNFb9b4WcYzRl6haci2037842870; game=rust; _ga=GA1.2.1304958935.1650355722; _gid=GA1.2.130948595.1650355722; Device-Id=sYVN3zG6xYbcQcvJUKLQ; csrf_token=Ijg2Y2YyZDM5ZjQ2ZGJkZjE0ZWNhOTZmM2U1YTI0M2QzMDY0ZDQ5ZjQi.FUtLrw.JPnZU0-Z26eppry3LBMwCdWiQqY; _ntes_nnid=425e523b63db53f1eac30854b296bfa4,1651067757502; _ntes_nuid=425e523b63db53f1eac30854b296bfa4",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
-}
 
 
-tm_header = {
-    "cookie": "PHPSESSID=tlfuh96cjh9mp5r1rg5qhhatve; _csrf=NRA6KZ3zz2hyLdbdQaZQMSmyStb95p7N; goon=0; d2mid=ZPH9X7oQIpuM5VE2EnR5bb1ZTRf1Vq; d2netAuthStatus=checked",
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36"
-}
-
-steam_headers = {
-            "Cookie": "timezoneOffset=10800,0; _ga=GA1.2.1303873552.1649809671; cookieSettings=%7B%22version%22%3A1%2C%22preference_state%22%3A1%2C%22content_customization%22%3Anull%2C%22valve_analytics%22%3Anull%2C%22third_party_analytics%22%3Anull%2C%22third_party_content%22%3Anull%2C%22utm_enabled%22%3Atrue%7D; steamMachineAuth76561199114300721=2F539F3C71C4C35EDE73F1506255D9ED75CF481E; browserid=2537224299487212475; steamMachineAuth76561198127512332=EB471D0470DB7C66771C2E3ED9DD8746A597C348; steamMachineAuth76561198318380866=21D2D97F8238BB1D1A03213D991CDF9E92F6A312; steamRememberLogin=76561198318380866%7C%7C8c10418101b67478e92a16116efd8c39; strInventoryLastContext=440_2; recentlyVisitedAppHubs=1222670%2C4000; _gid=GA1.2.77098118.1651354887; sessionid=627ec16bd36776425493cec0; steamLoginSecure=76561198318380866%7C%7CF2B481BF4D1B2CC6BF4DD7D9878A07BA60F22FF8; webTradeEligibility=%7B%22allowed%22%3A0%2C%22reason%22%3A16416%2C%22allowed_at_time%22%3A1652042694%2C%22steamguard_required_days%22%3A15%2C%22new_device_cooldown_days%22%3A7%2C%22time_checked%22%3A1651437894%7D; steamCountry=UA%7Cea023a65bfc3d3aed40d6b0af8681474"
-        }
+buff_header = pretty.buff_header
+tm_header = pretty.tm_header
+steam_headers = pretty.steam_headers
 
 
 class HuinyaParser:
@@ -42,7 +33,31 @@ class HuinyaParser:
 
         self.s_steam = requests.Session()
         self.s_steam.headers.update(steam_headers)
-                
+
+    def buff_first_item(self):
+        link = "https://buff.163.com/api/market/goods?game=rust&page_num=1&page_size=1"
+        r = self.s_buff.get(link, headers=buff_header)
+        item_id = json.loads(r.text)
+        return int(item_id['data']['items'][0]["id"])
+
+    def buff_rust_price_one(self):
+        
+        link = "https://buff.163.com/api/market/goods?game=rust&page_num=1&page_size=1"
+        r = self.s_buff.get(link)
+        item_id = json.loads(r.text)['data']['items'][0]["id"]
+        r = self.s_buff.get(buff_item_url.format(item_id))
+        data = json.loads(r.text)['data']
+        return_data = {
+            'prices': [],
+            'item_id': item_id,
+            'name': data['goods_infos'][str(item_id)]['market_hash_name'],
+            "steam_price": data['goods_infos'][str(item_id)]['steam_price'],
+            "icon_url": data['goods_infos'][str(item_id)]['icon_url']
+        }
+        for item in data['items']:
+            return_data['prices'].append(float(item['price']))
+        return return_data
+
     def get_pages(self):
         r = self.s_buff.get(buff_url.format(1))
         data = json.loads(r.text)['data']
@@ -94,7 +109,6 @@ class HuinyaParser:
             )
         return return_data
 
-
     def market_rust_all(self, name):
         r = self.s_tm.get(tm_url.format(name))
         soup = bs(r.text, 'lxml')
@@ -102,14 +116,33 @@ class HuinyaParser:
         links = div.find_all('a')
         return_data = []
         for link in links:
-            img = link.find('div', {'class': 'imageblock'})
-            price = img.find('div', {'class': 'price'}).text
-            data = {
-                "price": price.replace('\xa0', ''),
-                "link": "https://rust.tm{}".format(link['href'])
-            }
-            return_data.append(data)
+            link_name = link.find('div', {'class': 'name'}).text.replace("\n", "").strip().lower()
+            print(link_name)
+            if link_name == name.lower():
+                img = link.find('div', {'class': 'imageblock'})
+                price = img.find('div', {'class': 'price'}).text
+                data = {
+                    "price": price.replace('\xa0', ''),
+                    "link": "https://rust.tm{}".format(link['href'])
+                }
+                return_data.append(data)
         return return_data
+
+    # def market_rust_all(self, name):
+    #     r = self.s_tm.get(tm_url.format(name))
+    #     soup = bs(r.text, 'lxml')
+    #     div = soup.find('div', {'class': 'market-items'})
+    #     links = div.find_all('a')
+    #     return_data = []
+    #     for link in links:
+    #         img = link.find('div', {'class': 'imageblock'})
+    #         price = img.find('div', {'class': 'price'}).text
+    #         data = {
+    #             "price": price.replace('\xa0', ''),
+    #             "link": "https://rust.tm{}".format(link['href'])
+    #         }
+    #         return_data.append(data)
+    #     return return_data
 
     def market_rust_extended(self, link):
         r = self.s_tm.get(link)
@@ -119,7 +152,11 @@ class HuinyaParser:
             "min_price": "",
             "averange": "",
             "max_price": "",
-            "prices": []
+            "prices": [],
+            "autobuy": {
+                'all': "",
+                "requests": []
+            }
         }
         prices = soup.find('div', {'class': 'ip-prices'})
         spans = prices.find_all('span')
@@ -128,7 +165,24 @@ class HuinyaParser:
                 continue
             if "предложение" not in span.text or "предложения" not in span.text or "предложений" not in span.text: 
                 return_data['prices'].append(float(span.text.replace("\xa0", "")))
-        stats = soup.find("div", {'class': 'rectanglestats'})
+        item_stats = soup.find_all('div', {'class': 'rectanglestats'})
+        autobuy = item_stats[1]
+        zxc = autobuy.find_all('div', {'class': 'rectanglestat'})
+        for ind, stat in enumerate(zxc):
+            b = stat.find('b').text.replace("\xa0", "")
+            div = stat.find('div').text
+            if ind == len(zxc) - 1:
+                break
+            if ind == 0:
+               return_data['autobuy']['all'] = b
+            if div != None and div != "Всего запросов":
+                return_data['autobuy']['requests'].append(
+                    {
+                        "request_price": float(b),
+                        "request_count": div.split(" ")[0]
+                    }
+                )
+        stats = item_stats[0]
         for ind, stat in enumerate(stats.find_all("div", {'class': 'rectanglestat'})):
             t = stat.find('b').text.replace("\xa0", "")
             if ind == 0:
